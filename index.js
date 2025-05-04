@@ -76,12 +76,12 @@ const client = new Client({
 const aroundTheWorldResponses = [
   "Around the World 🌍🎶",
   "♫ Around the World ♫",
-  "Daft Punk - Around the World 🔊",
+  "Around the World 🔊",
   "AROUND THE WORLD! 🎵",
   "Around... The... World... 🎧",
   "Around the World 🤖💿",
   "🎵 Around the World 🎵",
-  "Around the World (daft punk remix) 🎛️",
+  "Around the World 🎛️",
   "Around the World 🌎🌀",
   "Around the World 🎶💫",
 ];
@@ -254,18 +254,34 @@ client.on("ready", async () => {
   await registerCommands();
 });
 
+// Dans votre handler d'interaction
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
 
+  // Solution ultime pour les problèmes de contexte serveur
+  if (!interaction.inGuild()) {
+    await interaction.reply({
+      content:
+        "🔒 Commande réservée aux serveurs. Merci de l'utiliser dans un salon textuel.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   try {
-    const member = await interaction.guild.members.fetch(interaction.user.id);
-    if (!(await hasPermission(member))) {
+    // Méthode garantie pour récupérer le membre
+    const guild = await client.guilds.fetch(interaction.guildId);
+    const member = await guild.members.fetch(interaction.user.id);
+
+    if (
+      !member.roles.cache.has(config.allowedRoleId) &&
+      !member.permissions.has(PermissionsBitField.Flags.Administrator)
+    ) {
       return interaction.reply({
-        content: "⛔ Vous n'avez pas la permission d'utiliser cette commande",
+        content: "⛔ Accès réservé aux membres autorisés",
         flags: MessageFlags.Ephemeral,
       });
     }
-
     if (interaction.commandName === "join") {
       if (await connectToVoice()) {
         log(`Commande /join exécutée par ${interaction.user.tag}`);
@@ -290,10 +306,20 @@ client.on("interactionCreate", async (interaction) => {
       });
     }
   } catch (err) {
-    log(`Erreur lors du traitement de l'interaction: ${err.message}`, "ERROR");
+    log(`Erreur interaction: ${err.stack}`, "ERROR");
+    if (interaction.replied || interaction.deferred) {
+      interaction.followUp({
+        content: "⚠️ Erreur lors du traitement",
+        flags: MessageFlags.Ephemeral,
+      });
+    } else {
+      interaction.reply({
+        content: "⚠️ Erreur lors du traitement",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
   }
 });
-
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
