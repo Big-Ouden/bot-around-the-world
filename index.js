@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { MessageFlags } = require("discord.js");
+const { MessageFlags, PermissionsBitField } = require("discord.js");
 const {
   Client,
   GatewayIntentBits,
@@ -40,6 +40,7 @@ const config = {
   clientId: process.env.CLIENT_ID,
   textChannelId: process.env.TEXT_CHANNEL_ID,
   voiceChannelId: process.env.VOICE_CHANNEL_ID,
+  allowedRoleId: process.env.ALLOWED_ROLE_ID,
   audioFile: path.join(__dirname, "around_the_world.mp3"),
 };
 
@@ -48,7 +49,8 @@ if (
   !config.token ||
   !config.clientId ||
   !config.textChannelId ||
-  !config.voiceChannelId
+  !config.voiceChannelId ||
+  !config.allowedRoleId
 ) {
   log("Configuration manquante dans .env", "ERROR");
   process.exit(1);
@@ -70,11 +72,42 @@ const client = new Client({
   ],
 });
 
+// Réponses aléatoires
+const aroundTheWorldResponses = [
+  "Around the World 🌍🎶",
+  "♫ Around the World ♫",
+  "Daft Punk - Around the World 🔊",
+  "AROUND THE WORLD! 🎵",
+  "Around... The... World... 🎧",
+  "Around the World 🤖💿",
+  "🎵 Around the World 🎵",
+  "Around the World (daft punk remix) 🎛️",
+  "Around the World 🌎🌀",
+  "Around the World 🎶💫",
+];
+
+const joinResponses = [
+  "🔊 Je suis dans le salon vocal !",
+  "🎵 Connexion au salon vocal réussie !",
+  "🤖 Je joue Around the World en boucle !",
+  "💿 Lecture en cours dans le salon vocal",
+];
+
+const quitResponses = [
+  "✅ J'ai quitté le salon vocal",
+  "🔇 Déconnexion du salon vocal",
+  "🎧 Musique arrêtée",
+  "🤖 Je quitte le salon vocal",
+];
+
+function getRandomResponse(responses) {
+  return responses[Math.floor(Math.random() * responses.length)];
+}
+
 // Gestion de la connexion
 let connection;
 const player = createAudioPlayer();
 
-// Gestion audio améliorée avec reconnexion automatique
 function setupPlayer() {
   player.on(AudioPlayerStatus.Idle, () => {
     try {
@@ -87,7 +120,7 @@ function setupPlayer() {
 
   player.on("error", (error) => {
     log(`Erreur audio: ${error.message}`, "ERROR");
-    setTimeout(() => playMusic(), 5000); // Tentative de reconnexion après 5s
+    setTimeout(() => playMusic(), 5000);
   });
 
   player.on(AudioPlayerStatus.Playing, () => {
@@ -172,16 +205,31 @@ function cleanup() {
 process.on("SIGINT", cleanup);
 process.on("SIGTERM", cleanup);
 
+// Vérification des permissions
+async function hasPermission(member) {
+  try {
+    return (
+      member.roles.cache.has(config.allowedRoleId) ||
+      member.permissions.has(PermissionsBitField.Flags.Administrator)
+    );
+  } catch (error) {
+    log(`Erreur de vérification des permissions: ${error.message}`, "ERROR");
+    return false;
+  }
+}
+
 // Enregistrement des commandes slash
 const registerCommands = async () => {
   try {
     const commands = [
       new SlashCommandBuilder()
         .setName("join")
-        .setDescription("Fait rejoindre le bot dans le salon vocal"),
+        .setDescription("Fait rejoindre le bot dans le salon vocal")
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
       new SlashCommandBuilder()
         .setName("quit")
-        .setDescription("Fait quitter le bot du salon vocal"),
+        .setDescription("Fait quitter le bot du salon vocal")
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
     ].map((command) => command.toJSON());
 
     const rest = new REST({ version: "10" }).setToken(config.token);
@@ -210,11 +258,19 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
 
   try {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    if (!(await hasPermission(member))) {
+      return interaction.reply({
+        content: "⛔ Vous n'avez pas la permission d'utiliser cette commande",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
     if (interaction.commandName === "join") {
       if (await connectToVoice()) {
         log(`Commande /join exécutée par ${interaction.user.tag}`);
         await interaction.reply({
-          content: "🔊 Je suis dans le salon vocal !",
+          content: getRandomResponse(joinResponses),
           flags: MessageFlags.Ephemeral,
         });
       } else {
@@ -229,7 +285,7 @@ client.on("interactionCreate", async (interaction) => {
       log(`Commande /quit exécutée par ${interaction.user.tag}`);
       await disconnectFromVoice();
       await interaction.reply({
-        content: "✅ J'ai quitté le salon vocal",
+        content: getRandomResponse(quitResponses),
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -241,9 +297,16 @@ client.on("interactionCreate", async (interaction) => {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
-  if (/around\s*the\s*world/gi.test(message.content)) {
-    log(`Détection "Around the World" par ${message.author.tag}`);
-    await message.reply("Around the World 🌍🎶");
+  try {
+    const member = await message.guild.members.fetch(message.author.id);
+    if (!(await hasPermission(member))) return;
+
+    if (/around\s*the\s*world/gi.test(message.content)) {
+      log(`Détection "Around the World" par ${message.author.tag}`);
+      await message.reply(getRandomResponse(aroundTheWorldResponses));
+    }
+  } catch (err) {
+    log(`Erreur lors du traitement du message: ${err.message}`, "ERROR");
   }
 });
 
