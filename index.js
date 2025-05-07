@@ -325,7 +325,6 @@ client.on("messageCreate", async (message) => {
 
   try {
     const member = await message.guild.members.fetch(message.author.id);
-    if (!(await hasPermission(member))) return;
 
     if (/around\s*the\s*world/gi.test(message.content)) {
       log(`Détection "Around the World" par ${message.author.tag}`);
