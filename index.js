@@ -225,11 +225,11 @@ const registerCommands = async () => {
       new SlashCommandBuilder()
         .setName("join")
         .setDescription("Fait rejoindre le bot dans le salon vocal")
-        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+        // .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
       new SlashCommandBuilder()
         .setName("quit")
         .setDescription("Fait quitter le bot du salon vocal")
-        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+      // .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
     ].map((command) => command.toJSON());
 
     const rest = new REST({ version: "10" }).setToken(config.token);
@@ -325,6 +325,7 @@ client.on("messageCreate", async (message) => {
 
   try {
     const member = await message.guild.members.fetch(message.author.id);
+    // if (!(await hasPermission(member))) return;
 
     if (/around\s*the\s*world/gi.test(message.content)) {
       log(`Détection "Around the World" par ${message.author.tag}`);
