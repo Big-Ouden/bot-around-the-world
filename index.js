@@ -304,11 +304,13 @@ client.on("interactionCreate", async (interaction) => {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
+  if (message.channelId !== config.textChannelId) return;
+
   const content = message.content;
 
   // Fonction pour normaliser (casse et espaces uniquement pour les fautes)
   const normalizeForTypos = (str) =>
-    str.toLowerCase().replace(/\s+/g, " ").trim();
+    str.toLowerCase().replace(/\s+/gi, " ").trim();
 
   const normalizedContent = normalizeForTypos(content);
 
